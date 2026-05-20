@@ -1,1 +1,234 @@
-[]
+[
+  {
+    "run_id": "22c4a5c0",
+    "risk_level": "moderate",
+    "total_time_sec": 21.75,
+    "ner_merged_count": 0,
+    "ner_loaded": false,
+    "workflow_steps": {
+      "file_upload": {
+        "passed": true,
+        "icon": "✅"
+      },
+      "ocr_extraction": {
+        "passed": true,
+        "icon": "✅"
+      },
+      "ner_processing": {
+        "passed": true,
+        "icon": "✅"
+      },
+      "llm_analysis": {
+        "passed": true,
+        "icon": "✅"
+      },
+      "result_display": {
+        "passed": true,
+        "icon": "✅"
+      },
+      "overall": true
+    },
+    "workflow_all_pass": true,
+    "timestamp": "2026-05-21T02:55:01.771747"
+  },
+  {
+    "run_id": "f9b2f215",
+    "risk_level": "moderate",
+    "total_time_sec": 11.54,
+    "ner_merged_count": 0,
+    "ner_loaded": false,
+    "workflow_steps": {
+      "file_upload": {
+        "passed": true,
+        "icon": "✅"
+      },
+      "ocr_extraction": {
+        "passed": true,
+        "icon": "✅"
+      },
+      "ner_processing": {
+        "passed": true,
+        "icon": "✅"
+      },
+      "llm_analysis": {
+        "passed": true,
+        "icon": "✅"
+      },
+      "result_display": {
+        "passed": true,
+        "icon": "✅"
+      },
+      "overall": true
+    },
+    "workflow_all_pass": true,
+    "timestamp": "2026-05-21T03:02:34.855051"
+  },
+  {
+    "run_id": "75215d8d",
+    "risk_level": "moderate",
+    "total_time_sec": 13.34,
+    "ner_merged_count": 0,
+    "ner_loaded": false,
+    "timestamp": "2026-05-21T03:35:18.004549"
+  },
+  {
+    "run_id": "519cccef",
+    "risk_level": "moderate",
+    "total_time_sec": 19.77,
+    "ner_merged_count": 0,
+    "ner_loaded": false,
+    "workflow_steps": {
+      "file_upload": {
+        "passed": true,
+        "icon": "✅"
+      },
+      "ocr_extraction": {
+        "passed": true,
+        "icon": "✅"
+      },
+      "ner_processing": {
+        "passed": true,
+        "icon": "✅"
+      },
+      "llm_analysis": {
+        "passed": true,
+        "icon": "✅"
+      },
+      "result_display": {
+        "passed": true,
+        "icon": "✅"
+      },
+      "overall": true
+    },
+    "workflow_all_pass": true,
+    "timestamp": "2026-05-21T03:37:43.420748"
+  },
+  {
+    "run_id": "d9a53489",
+    "risk_level": "moderate",
+    "total_time_sec": 14.42,
+    "ner_merged_count": 0,
+    "ner_loaded": false,
+    "workflow_steps": {
+      "file_upload": {
+        "passed": true,
+        "icon": "✅"
+      },
+      "ocr_extraction": {
+        "passed": true,
+        "icon": "✅"
+      },
+      "ner_processing": {
+        "passed": true,
+        "icon": "✅"
+      },
+      "llm_analysis": {
+        "passed": true,
+        "icon": "✅"
+      },
+      "result_display": {
+        "passed": true,
+        "icon": "✅"
+      },
+      "overall": true
+    },
+    "workflow_all_pass": true,
+    "timestamp": "2026-05-21T03:54:48.933567"
+  },
+  {
+    "run_id": "d0e5a517",
+    "risk_level": "high",
+    "total_time_sec": 10.87,
+    "ner_merged_count": 0,
+    "ner_loaded": false,
+    "workflow_steps": {
+      "file_upload": {
+        "passed": true,
+        "icon": "✅"
+      },
+      "ocr_extraction": {
+        "passed": true,
+        "icon": "✅"
+      },
+      "ner_processing": {
+        "passed": true,
+        "icon": "✅"
+      },
+      "llm_analysis": {
+        "passed": true,
+        "icon": "✅"
+      },
+      "result_display": {
+        "passed": true,
+        "icon": "✅"
+      },
+      "overall": true
+    },
+    "workflow_all_pass": true,
+    "timestamp": "2026-05-21T03:59:32.807931"
+  },
+  {
+    "run_id": "212b4131",
+    "risk_level": "moderate",
+    "total_time_sec": 14.99,
+    "ner_merged_count": 0,
+    "ner_loaded": false,
+    "workflow_steps": {
+      "file_upload": {
+        "passed": true,
+        "icon": "✅"
+      },
+      "ocr_extraction": {
+        "passed": true,
+        "icon": "✅"
+      },
+      "ner_processing": {
+        "passed": true,
+        "icon": "✅"
+      },
+      "llm_analysis": {
+        "passed": true,
+        "icon": "✅"
+      },
+      "result_display": {
+        "passed": true,
+        "icon": "✅"
+      },
+      "overall": true
+    },
+    "workflow_all_pass": true,
+    "timestamp": "2026-05-21T04:01:23.616658"
+  },
+  {
+    "run_id": "f439e23b",
+    "risk_level": "normal",
+    "total_time_sec": 15.39,
+    "ner_merged_count": 0,
+    "ner_loaded": false,
+    "workflow_steps": {
+      "file_upload": {
+        "passed": true,
+        "icon": "✅"
+      },
+      "ocr_extraction": {
+        "passed": true,
+        "icon": "✅"
+      },
+      "ner_processing": {
+        "passed": true,
+        "icon": "✅"
+      },
+      "llm_analysis": {
+        "passed": true,
+        "icon": "✅"
+      },
+      "result_display": {
+        "passed": true,
+        "icon": "✅"
+      },
+      "overall": true
+    },
+    "workflow_all_pass": true,
+    "timestamp": "2026-05-21T04:03:27.572730"
+  }
+]

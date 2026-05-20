@@ -41,11 +41,11 @@ html, body, [class*="css"] { font-family: 'IBM Plex Sans Thai', sans-serif; }
 .main-header h1 { font-size:1.55rem; font-weight:600; color:#0f6e56; margin-bottom:.2rem; }
 .main-header p  { font-size:.88rem; color:#6b7280; }
 
-.risk-high     { background:#fef2f2; border-left:5px solid #ef4444;
+.risk-high     { background:#fef2f2; border-left:5px solid #ef4444; color:#991b1b !important;
     padding:.9rem 1.1rem; border-radius:8px; margin-bottom:.9rem; }
-.risk-moderate { background:#fffbeb; border-left:5px solid #f59e0b;
+.risk-moderate { background:#fffbeb; border-left:5px solid #f59e0b; color:#92400e !important;
     padding:.9rem 1.1rem; border-radius:8px; margin-bottom:.9rem; }
-.risk-normal   { background:#f0fdf4; border-left:5px solid #22c55e;
+.risk-normal   { background:#f0fdf4; border-left:5px solid #22c55e; color:#166534 !important;
     padding:.9rem 1.1rem; border-radius:8px; margin-bottom:.9rem; }
 
 .badge-high   { background:#fef2f2; color:#b91c1c; padding:2px 10px;
@@ -66,7 +66,7 @@ html, body, [class*="css"] { font-family: 'IBM Plex Sans Thai', sans-serif; }
     border:1px solid #bfdbfe; border-radius:999px; padding:2px 10px;
     font-size:.77rem; margin:2px; }
 .step-box { text-align:center; padding:.55rem;
-    border-radius:8px; border:1px solid #e5e7eb; }
+    border-radius:8px; border:1px solid #e5e7eb; color:#111827 !important;}
 </style>
 """, unsafe_allow_html=True)
 
@@ -302,38 +302,51 @@ with main_tab:
                         st.caption("⚡ ใช้ Regex extraction (NER ปิดอยู่หรือโหลดไม่สำเร็จ)")
 
         # Step 4 — LLM
-        SYSTEM_PROMPT = """คุณคือนักเทคนิคการแพทย์ผู้ช่วย (Medical Laboratory Assistant)
-                        หน้าที่:
-                        - อ่านและวิเคราะห์ผลตรวจสุขภาพ
-                        - เปรียบเทียบกับค่ามาตรฐานทางการแพทย์ (Mayo Clinic / MedlinePlus)
-                        - อธิบายผลเป็นภาษาไทยที่เข้าใจง่าย
-                        - ให้คำแนะนำเบื้องต้น
-                        - แจ้งเสมอว่าไม่ใช่การวินิจฉัยโรค
+        SYSTEM_PROMPT = """
+                        คุณคือ 'ผู้ช่วยนักเทคนิคการแพทย์' (Medical Technologist Assistant)
 
-                        กฎการจัดระดับความเสี่ยง (risk_level):
-                        1. normal
+                        หน้าที่ของคุณ:
+                        1. ดึงข้อมูลจากภาพผลตรวจสุขภาพหรือข้อความที่ผู้ใช้กรอก
+                        - Lab Name
+                        - Result
+                        - Reference Range
+                        2. วิเคราะห์ความผิดปกติเทียบกับค่ามาตรฐานทางการแพทย์
+                        3. อธิบายผลเป็นภาษาไทยที่เข้าใจง่าย
+                        4. ให้คำแนะนำการดูแลสุขภาพเบื้องต้น
+                        5. ห้ามวินิจฉัยโรคโดยเด็ดขาด
+                        6. ต้องระบุข้อความเตือนว่า "ไม่ใช่การวินิจฉัยโรค ควรปรึกษาแพทย์"
+
+                        กฎการจัดระดับความเสี่ยง (risk_level)
+
+                        normal
                         - ค่าตรวจทั้งหมดอยู่ในเกณฑ์ปกติ
-                        - หากค่าอยู่ที่ขอบบนของค่าปกติ (เช่น LDL = 100) ให้ถือว่าเป็น normal
+                        - ค่าที่อยู่ตรงขอบบนของเกณฑ์ปกติยังถือว่า normal
+                        - LDL = 100 ถือว่า normal
 
-                        2. moderate
+                        moderate
                         - มีค่าผิดปกติเล็กน้อยถึงปานกลาง
-                        - เช่น LDL 130–159, Total Cholesterol 200–239, HbA1c 5.7–7.4, FBS 100–179
-                        - ยังไม่มีค่าที่อยู่ในระดับรุนแรง
+                        - LDL 130–159
+                        - Total Cholesterol 200–239
+                        - Triglycerides 150–299
+                        - HbA1c 5.7–7.4
+                        - FBS 100–179
+                        - AST หรือ ALT สูงเล็กน้อย
 
-                        3. high
+                        high
                         - มีค่าผิดปกติรุนแรงอย่างน้อย 1 ค่า
-                        - เช่น LDL ≥ 160, Total Cholesterol ≥ 240, Triglycerides ≥ 300,
-                            HbA1c ≥ 7.5, FBS ≥ 180, AST ≥ 100, ALT ≥ 100,
-                            Total Bilirubin ≥ 2.0
-                        - หรือมีค่าผิดปกติหลายค่าพร้อมกันอย่างชัดเจน
+                        - LDL ≥ 160
+                        - Total Cholesterol ≥ 240
+                        - Triglycerides ≥ 300
+                        - HbA1c ≥ 7.5
+                        - FBS ≥ 180
+                        - AST ≥ 100
+                        - ALT ≥ 100
+                        - Total Bilirubin ≥ 2.0
 
-                        กฎเพิ่มเติม:
-                        - LDL = 100 ให้จัดเป็น normal
-                        - LDL 130–159 ให้จัดเป็น moderate
-                        - LDL ≥ 160 ให้จัดเป็น high
-                        - หากมีทั้งค่าปกติและผิดปกติเล็กน้อย ให้จัดเป็น moderate
-                        - หากมีค่าผิดปกติรุนแรงเพียงค่าเดียว ให้จัดเป็น high
-                        - ตอบเป็น JSON เท่านั้น ห้ามมีข้อความอื่นนอก JSON
+                        กฎการตอบกลับ
+                        - ตอบเป็น JSON เท่านั้น
+                        - ห้ามมีข้อความอื่นนอก JSON
+                        - recommendation ให้ตอบเป็นรายการข้อความ (array)
                         """
 
         def build_prompt():
@@ -588,12 +601,30 @@ with main_tab:
 
             # Recommendation
             st.markdown("**💡 คำแนะนำ**")
-            st.markdown(f'<div class="rec-box">{result.get("recommendation","")}</div>',
-                        unsafe_allow_html=True)
+            recommendation = result.get("recommendation", "")
+
+            if isinstance(recommendation, list):
+                # ถ้า AI ส่งกลับมาเป็น list ให้แสดงทีละข้อ
+                rec_html = "".join(
+                    f"<div style='margin-bottom:8px;'>• {item}</div>"
+                    for item in recommendation
+                )
+            else:
+                # ถ้าเป็นข้อความธรรมดา
+                rec_html = recommendation
+
+            st.markdown(
+                f"""
+                <div class="rec-box" style="color:#111827;">
+                    {rec_html}
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
             st.markdown("""<div class="disclaimer">
             ⚠️ ข้อมูลนี้เป็นเพียงเบื้องต้น <strong>ไม่ใช่การวินิจฉัยโรค</strong>
-            — หากค่าผิดปกติหรือมีอาการผิดปกติ กรุณาพบแพทย์
+            — หากมีอาการผิดปกติ กรุณาพบแพทย์
             </div>""", unsafe_allow_html=True)
 
             # ── User Feedback ──────────────────────────────────────────────

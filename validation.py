@@ -1,7 +1,7 @@
 """
 System Validation — วัดผลและยืนยันการทำงานของระบบ
 ครอบคลุม:
-  1. Functional Testing  – ตรวจสอบ Workflow ทุกขั้นตอน
+  1. Functional Testing   – ตรวจสอบ Workflow ทุกขั้นตอน
   2. Quantitative Metrics – OCR accuracy, classification accuracy,
                             processing time, NER precision
   3. User Feedback        – เก็บ rating + comment ต่อ session
