@@ -42,12 +42,12 @@
 
 ## 📁 Project Structure
 
-app.py                  # Streamlit main app
-ner_pipeline.py         # NER extraction pipeline
-validation.py           # Benchmark & validation system
-validation_log.json     # logs
-requirements.txt        # dependencies
-README.md               # documentation
+- app.py                  # Streamlit main app
+- ner_pipeline.py         # NER extraction pipeline
+- validation.py           # Benchmark & validation system
+- validation_log.json     # logs
+- requirements.txt        # dependencies
+- README.md               # documentation
 
 ## ⚙️ Installation
 
