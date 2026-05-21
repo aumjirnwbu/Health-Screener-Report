@@ -127,20 +127,25 @@ with main_tab:
         with input_tab1:
             if "uploaded_file_key" not in st.session_state:
                 st.session_state.uploaded_file_key = 0
+
             uploaded_file = st.file_uploader(
                 "ภาพผลตรวจ (JPG/PNG)",
-                type=["jpg","jpeg","png"],
+                type=["jpg", "jpeg", "png"],
                 key=f"upload_{st.session_state.uploaded_file_key}",
                 label_visibility="collapsed"
             )
+
             if uploaded_file:
+                # ล้าง text area
                 st.session_state["manual_lab_text"] = ""
-                manual_text = ""
+
                 img = Image.open(uploaded_file)
                 st.image(img, use_container_width=True)
+
                 buf = io.BytesIO()
                 img.save(buf, format="PNG")
-                uploaded_image    = base64.b64encode(buf.getvalue()).decode()
+
+                uploaded_image = base64.b64encode(buf.getvalue()).decode()
                 uploaded_mimetype = "image/png"
 
         with input_tab2:
@@ -154,12 +159,15 @@ with main_tab:
                     "LDL: 145\nHDL: 42\nTriglycerides: 180"
                 )
             )
+
+        # ถ้ามีพิมพ์ข้อความ → ล้างรูป
         if manual_text.strip():
             uploaded_image = None
             uploaded_mimetype = "image/png"
-            
+
             if uploaded_file is not None:
                 st.session_state.uploaded_file_key += 1
+                st.rerun()
 
         st.markdown("#### 🧾 ข้อมูลเพิ่มเติม")
         c1, c2 = st.columns(2)
