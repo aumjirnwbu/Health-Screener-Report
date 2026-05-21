@@ -1,13 +1,11 @@
 """
 Health Screener & Lab Explainer
 Main Streamlit Application
-รวม: NER (bert-base-NER) + Claude AI + System Validation
+รวม: NER (bert-base-NER) + Groq AI + System Validation
 """
 
 import streamlit as st
-import anthropic
 from openai import OpenAI
-from google import genai
 import base64
 import json
 import re
@@ -71,6 +69,19 @@ html, body, [class*="css"] { font-family: 'IBM Plex Sans Thai', sans-serif; }
 """, unsafe_allow_html=True)
 
 # ─── Header ───────────────────────────────────────────────────────────────────
+
+# ─── Groq Config ─────────────────────────────────────────────────────────────
+provider = "groq"
+model_id = "llama-3.2-11b-vision-preview"
+
+api_key = st.secrets["GROQ_API_KEY"]
+
+use_ner = st.toggle(
+    "🤖 เปิดใช้ NER (bert-base-NER)",
+    value=True,
+    help="ใช้ HuggingFace NER ระบุค่าตรวจก่อนส่ง AI"
+)
+
 st.markdown("""
 <div class="main-header">
     <h1>🧬 Health Screener & Lab Explainer</h1>
@@ -78,88 +89,27 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# ─── Sidebar ──────────────────────────────────────────────────────────────────
-with st.sidebar:
-    st.header("⚙️ การตั้งค่า")
+# ─── Settings / Workflow ──────────────────────────────────────────
+top_c1, top_c2 = st.columns([1, 1])
 
-    # ── Model selector ────────────────────────────────────────────────────────
-    MODEL_OPTIONS = {
-        "Claude Opus 4.5  (Anthropic)":        ("anthropic", "claude-opus-4-5"),
-        "Claude Sonnet 4.5  (Anthropic)":      ("anthropic", "claude-sonnet-4-5"),
-        "Claude Haiku 4.5  (Anthropic)":       ("anthropic", "claude-haiku-4-5-20251001"),
-        "Gemini 3 Flash Preview  (Google)":    ("google",    "gemini-3-flash-preview"),
-        "Gemini 3.1 Pro Preview  (Google)":    ("google",    "gemini-3.1-pro-preview"),
-        "GPT-5 (OpenAI)":                      ("openai",    "gpt-5"),
-        "GPT-5 Mini (OpenAI)":                 ("openai",    "gpt-5-mini"),
-        "GPT-4.1 (OpenAI)":                    ("openai",    "gpt-4.1"),
-
-    }
-
-    selected_label = st.selectbox(
-        "🤖 เลือกโมเดล AI",
-        list(MODEL_OPTIONS.keys()),
-        index=0,
-        help="Anthropic → ใช้ Anthropic API Key\nGoogle → ใช้ Google AI API Key\nOpenAI → ใช้ OpenAI API Key",
+with top_c1:
+    use_ner = st.toggle(
+        "🤖 เปิดใช้ NER (bert-base-NER)",
+        value=True,
+        help="ใช้ HuggingFace NER ระบุค่าตรวจก่อนส่ง AI\n(โหลดครั้งแรกอาจช้า ~30s)"
     )
-    provider, model_id = MODEL_OPTIONS[selected_label]
 
-    # badge แสดง provider
-    if provider == "google":
-        badge_color = "#e0f2fe"
-        badge_text_color = "#0369a1"
-        provider_label = "Google AI"
-    elif provider == "openai":
-        badge_color = "#f3e8ff"
-        badge_text_color = "#7c3aed"
-        provider_label = "OpenAI"
-    else:
-        badge_color = "#e6f7f2"
-        badge_text_color = "#0f6e56"
-        provider_label = "Anthropic"
-    st.markdown(
-        f'<span style="background:{badge_color};color:{badge_text_color};'
-        f'padding:2px 10px;border-radius:999px;font-size:.78rem;font-weight:600">'
-        f'🔑 ต้องการ: {provider_label} API Key</span>',
-        unsafe_allow_html=True,
+with top_c2:
+    st.info(
+        "📌 Workflow\n"
+        "1️⃣ อัปโหลด / พิมพ์ค่าตรวจ\n"
+        "2️⃣ NER ระบุชื่อ-ค่า\n"
+        "3️⃣ AI วิเคราะห์\n"
+        "4️⃣ แสดงผล + Metrics"
     )
-    st.markdown("")
 
-    # ── API Key (label เปลี่ยนตาม provider) ──────────────────────────────────
-    if provider == "google":
-        api_key = st.text_input(
-            "Google AI API Key",
-            type="password",
-            help="ขอได้ที่ https://aistudio.google.com/apikey",
-            placeholder="AIza...",
-        )
-    elif provider == "openai":
-        api_key = st.text_input(
-            "OpenAI API Key",
-            type="password",
-            help="ขอได้ที่ https://platform.openai.com/api-keys",
-            placeholder="sk-...",
-        )
-    else:
-        api_key = st.text_input(
-            "Anthropic API Key",
-            type="password",
-            help="ขอได้ที่ https://console.anthropic.com",
-            placeholder="sk-ant-...",
-        )
-    st.session_state["api_key"] = api_key
-    st.session_state["provider"] = provider
-    st.session_state["model_id"] = model_id
-
-    st.markdown("---")
-    use_ner = st.toggle("🤖 เปิดใช้ NER (bert-base-NER)", value=True,
-                        help="ใช้ HuggingFace NER ระบุค่าตรวจก่อนส่ง AI\n(โหลดครั้งแรกอาจช้า ~30s)")
-    st.markdown("---")
-    st.markdown("**Workflow**")
-    st.markdown("1️⃣ อัปโหลด / พิมพ์ค่าตรวจ  \n"
-                "2️⃣ NER ระบุชื่อ-ค่า-หน่วย  \n"
-                "3️⃣ AI วิเคราะห์  \n"
-                "4️⃣ แสดงผล + บันทึก Metrics")
-    st.caption("⚠️ ไม่ใช่การวินิจฉัยโรค ควรปรึกษาแพทย์")
+st.caption("⚠️ ไม่ใช่การวินิจฉัยโรค ควรปรึกษาแพทย์")
+st.markdown("---")
 
 # ─── Main Tabs ────────────────────────────────────────────────────────────────
 main_tab, validation_tab = st.tabs(["🔬 วิเคราะห์ผลตรวจ", "📊 System Validation"])
@@ -218,13 +168,43 @@ with main_tab:
                 st.session_state.uploaded_file_key += 1
 
         st.markdown("#### 🧾 ข้อมูลเพิ่มเติม")
-        c1, c2, c3 = st.columns(3)
+        c1, c2 = st.columns(2)
         with c1:
             age = st.number_input("อายุ (ปี)", 0, 120, 0)
         with c2:
             gender = st.selectbox("เพศ", ["ไม่ระบุ","ชาย","หญิง"])
-        with c3:
-            bmi_v = st.number_input("BMI", 0.0, 60.0, 0.0, 0.1)
+
+        # น้ำหนัก / ส่วนสูง → คำนวณ BMI อัตโนมัติ
+        cw, ch, cb = st.columns(3)
+        with cw:
+            weight_kg = st.number_input("น้ำหนัก (กก.)", 0.0, 300.0, 0.0, 0.1)
+        with ch:
+            height_cm = st.number_input("ส่วนสูง (ซม.)", 0.0, 250.0, 0.0, 0.1)
+        with cb:
+            if weight_kg > 0 and height_cm > 0:
+                bmi_v = round(weight_kg / (height_cm / 100) ** 2, 1)
+                # จัดระดับ BMI
+                if bmi_v < 18.5:
+                    bmi_cat, bmi_color = "ต่ำกว่าเกณฑ์", "#3b82f6"
+                elif bmi_v < 23:
+                    bmi_cat, bmi_color = "ปกติ", "#22c55e"
+                elif bmi_v < 25:
+                    bmi_cat, bmi_color = "ท้วม", "#f59e0b"
+                elif bmi_v < 30:
+                    bmi_cat, bmi_color = "อ้วน", "#ef4444"
+                else:
+                    bmi_cat, bmi_color = "อ้วนมาก", "#b91c1c"
+                st.markdown(
+                    f"""<div style="margin-top:26px;padding:8px 12px;border-radius:8px;
+                    background:#f9fafb;border:1px solid #e5e7eb;text-align:center">
+                    <div style="font-size:1.3rem;font-weight:700;color:{bmi_color}">{bmi_v}</div>
+                    <div style="font-size:.75rem;color:{bmi_color};font-weight:600">{bmi_cat}</div>
+                    <div style="font-size:.7rem;color:#9ca3af">BMI</div></div>""",
+                    unsafe_allow_html=True
+                )
+            else:
+                bmi_v = st.number_input("BMI (ถ้าทราบ)", 0.0, 60.0, 0.0, 0.1,
+                                        help="กรอกน้ำหนัก+ส่วนสูงด้านซ้ายให้คำนวณอัตโนมัติ")
 
         symptoms = st.multiselect("อาการ / โรคประจำตัว", [
             "เหนื่อยง่าย","ปวดหัวบ่อย","กระหายน้ำมาก","ปัสสาวะบ่อย",
@@ -398,100 +378,62 @@ with main_tab:
             return "\n\n".join(parts)
 
         result = None
-        with st.spinner(f"🧠 {selected_label} กำลังวิเคราะห์..."):
+        with st.spinner("🧠 Groq Llama Vision กำลังวิเคราะห์..."):
             try:
                 user_prompt = build_prompt()
 
-                # ------------------------------------------------------------------
-                # Anthropic Claude
-                # ------------------------------------------------------------------
-                if provider == "anthropic":
-                    client = anthropic.Anthropic(api_key=api_key)
+                from openai import OpenAI
 
-                    user_content = []
-                    if uploaded_image:
-                        user_content.append({
-                            "type": "image",
-                            "source": {
-                                "type": "base64",
-                                "media_type": uploaded_mimetype,
-                                "data": uploaded_image
-                            }
-                        })
+                client = OpenAI(
+                    api_key=st.secrets["GROQ_API_KEY"],
+                    base_url="https://api.groq.com/openai/v1"
+                )
 
-                    user_content.append({
-                        "type": "text",
-                        "text": user_prompt
-                    })
-
-                    response = client.messages.create(
-                        model=model_id,   # ใช้ model ที่เลือกจาก sidebar
-                        max_tokens=2000,
-                        system=SYSTEM_PROMPT,
-                        messages=[
-                            {
-                                "role": "user",
-                                "content": user_content
-                            }
-                        ]
-                    )
-
-                    raw = response.content[0].text.strip()
-
-                # ------------------------------------------------------------------
-                # Google Gemini
-                # ------------------------------------------------------------------
-                elif provider == "google":
-                    from google import genai
-                    from PIL import Image
-                    import io
-                    import base64
-
-                    client = genai.Client(api_key=api_key)
-
-                    contents = []
-
-                    # ถ้ามีรูปภาพ ให้แปลง bytes -> PIL Image
-                    if uploaded_image:
-                        image_bytes = base64.b64decode(uploaded_image)
-                        pil_image = Image.open(io.BytesIO(image_bytes))
-                        contents.append(pil_image)
-
-                    # เพิ่มข้อความ prompt
-                    contents.append(f"{SYSTEM_PROMPT}\n\n{user_prompt}")
-
-                    response = client.models.generate_content(
-                        model=model_id,
-                        contents=contents
-                    )
-
-                    raw = response.text.strip()
-
-                # ------------------------------------------------------------------
-                # OpenAI ChatGPT
-                # ------------------------------------------------------------------
-                elif provider == "openai":
-                    from openai import OpenAI
-
-                    client = OpenAI(api_key=api_key)
-
+                # ถ้ามีรูปภาพ
+                if uploaded_image:
                     messages = [
-                        {"role": "system", "content": SYSTEM_PROMPT},
-                        {"role": "user", "content": user_prompt},
+                        {
+                            "role": "system",
+                            "content": SYSTEM_PROMPT
+                        },
+                        {
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": user_prompt
+                                },
+                                {
+                                    "type": "image_url",
+                                    "image_url": {
+                                        "url": f"data:image/png;base64,{uploaded_image}"
+                                    }
+                                }
+                            ]
+                        }
                     ]
 
-                    # หมายเหตุ: โค้ดนี้รองรับเฉพาะข้อความ
-                    # หากต้องการส่งภาพด้วย ให้เพิ่ม logic สำหรับ vision models
-                    response = client.chat.completions.create(
-                        model=model_id,
-                        messages=messages,
-                        max_completion_tokens=2000,
-                    )
-
-                    raw = response.choices[0].message.content.strip()
-
+                # ไม่มีรูป
                 else:
-                    raise ValueError(f"ไม่รองรับ provider: {provider}")
+                    messages = [
+                        {
+                            "role": "system",
+                            "content": SYSTEM_PROMPT
+                        },
+                        {
+                            "role": "user",
+                            "content": user_prompt
+                        }
+                    ]
+
+                response = client.chat.completions.create(
+                    model="llama-3.2-11b-vision-preview",
+                    messages=messages,
+                    temperature=0.2,
+                    max_tokens=2000,
+                )
+
+                raw = response.choices[0].message.content.strip()
 
                 # ------------------------------------------------------------------
                 # Parse JSON
