@@ -132,7 +132,10 @@ with main_tab:
 
         uploaded_image = st.session_state.uploaded_image_data
         uploaded_mimetype = "image/png"
-
+        if st.session_state.get("clear_inputs_flag", False):
+            st.session_state.manual_lab_text = ""
+            st.session_state.uploaded_image_data = None
+            st.session_state.clear_inputs_flag = False
         # ─────────────────────────────────────────────
         # tabs
         # ─────────────────────────────────────────────
@@ -523,8 +526,7 @@ with main_tab:
         st.session_state["last_saving"]  = time_saving
         st.session_state["last_ner"]     = ner_output
 
-        st.session_state.uploaded_image_data = None
-        st.session_state.manual_lab_text = ""
+        st.session_state.clear_inputs_flag = True
         st.session_state.uploaded_file_key += 1
 
         st.rerun()
