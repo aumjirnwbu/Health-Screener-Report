@@ -118,8 +118,6 @@ with main_tab:
     # ── Input (left) ──────────────────────────────────────────────────────────
     with left_col:
         st.markdown("#### 📥 ข้อมูลผลตรวจ")
-        input_tab1, input_tab2 = st.tabs(["📷 อัปโหลดภาพ", "✏️ พิมพ์ค่าตรวจ"])
-
         # ─────────────────────────────────────────────
         # init session state
         # ─────────────────────────────────────────────
@@ -128,6 +126,9 @@ with main_tab:
 
         if "manual_lab_text" not in st.session_state:
             st.session_state.manual_lab_text = ""
+        
+        if "uploaded_image_data" not in st.session_state:
+            st.session_state.uploaded_image_data = None
 
         uploaded_image = None
         uploaded_mimetype = "image/png"
@@ -151,13 +152,10 @@ with main_tab:
                 label_visibility="collapsed"
             )
 
-            # ถ้ามีการอัปโหลดรูป
             if uploaded_file is not None:
 
-                # เคลียร์ text area
-                if st.session_state.manual_lab_text != "":
-                    st.session_state.manual_lab_text = ""
-                    st.rerun()
+                # clear text
+                st.session_state.manual_lab_text = ""
 
                 img = Image.open(uploaded_file)
 
@@ -166,9 +164,10 @@ with main_tab:
                 buf = io.BytesIO()
                 img.save(buf, format="PNG")
 
-                uploaded_image = base64.b64encode(
-                    buf.getvalue()
-                ).decode()
+                # เก็บลง session state
+                st.session_state.uploaded_image_data = (
+                    base64.b64encode(buf.getvalue()).decode()
+                )
 
         # ─────────────────────────────────────────────
         # TAB 2 : manual input
@@ -195,7 +194,7 @@ with main_tab:
         # ─────────────────────────────────────────────
         if st.session_state.manual_lab_text.strip():
 
-            uploaded_image = None
+            uploaded_image = st.session_state.uploaded_image_data
 
             # reset file uploader
             if uploaded_file is not None:
