@@ -130,7 +130,7 @@ with main_tab:
         if "uploaded_image_data" not in st.session_state:
             st.session_state.uploaded_image_data = None
 
-        uploaded_image = None
+        uploaded_image = st.session_state.uploaded_image_data
         uploaded_mimetype = "image/png"
 
         # ─────────────────────────────────────────────
@@ -194,7 +194,11 @@ with main_tab:
         # ─────────────────────────────────────────────
         if st.session_state.manual_lab_text.strip():
 
-            uploaded_image = st.session_state.uploaded_image_data
+            st.session_state.uploaded_image_data = None
+
+            uploaded_image = None
+            uploaded_mimetype = "image/png"
+
 
             # reset file uploader
             if uploaded_file is not None:
