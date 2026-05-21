@@ -523,6 +523,12 @@ with main_tab:
         st.session_state["last_saving"]  = time_saving
         st.session_state["last_ner"]     = ner_output
 
+        st.session_state.uploaded_image_data = None
+        st.session_state.manual_lab_text = ""
+        st.session_state.uploaded_file_key += 1
+
+        st.rerun()
+
     # ── Render result ──────────────────────────────────────────────────────────
     if "last_result" in st.session_state and st.session_state["last_result"]:
         result      = st.session_state["last_result"]
