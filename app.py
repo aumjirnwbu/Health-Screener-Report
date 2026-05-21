@@ -201,11 +201,9 @@ with main_tab:
 
 
             # reset file uploader
-            if uploaded_file is not None:
+            st.session_state.uploaded_file_key += 1
 
-                st.session_state.uploaded_file_key += 1
-
-                st.rerun()
+            st.rerun()
 
         st.markdown("#### 🧾 ข้อมูลเพิ่มเติม")
         c1, c2 = st.columns(2)
