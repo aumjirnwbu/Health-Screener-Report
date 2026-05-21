@@ -425,6 +425,7 @@ with main_tab:
                     messages=messages,
                     temperature=0.2,
                     max_tokens=2000,
+                    response_format={"type": "json_object"},
                 )
 
                 raw = response.choices[0].message.content.strip()
