@@ -72,7 +72,7 @@ html, body, [class*="css"] { font-family: 'IBM Plex Sans Thai', sans-serif; }
 
 # ─── Groq Config ─────────────────────────────────────────────────────────────
 provider = "groq"
-model_id = "llama-3.2-11b-vision-preview"
+model_id = "meta-llama/llama-4-scout-17b-16e-instruct"
 
 api_key = st.secrets["GROQ_API_KEY"]
 
@@ -85,7 +85,7 @@ use_ner = st.toggle(
 st.markdown("""
 <div class="main-header">
     <h1>🧬 Health Screener & Lab Explainer</h1>
-    <p>อัปโหลดผลตรวจสุขภาพ → NER ระบุค่า → Claude AI วิเคราะห์ → คำอธิบายภาษาไทย</p>
+    <p>อัปโหลดผลตรวจสุขภาพ → NER ระบุค่า → Groq AI วิเคราะห์ → คำอธิบายภาษาไทย</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -427,7 +427,7 @@ with main_tab:
                     ]
 
                 response = client.chat.completions.create(
-                    model="llama-3.2-11b-vision-preview",
+                    model="meta-llama/llama-4-scout-17b-16e-instruct",
                     messages=messages,
                     temperature=0.2,
                     max_tokens=2000,
