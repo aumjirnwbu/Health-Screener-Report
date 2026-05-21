@@ -11,39 +11,52 @@ from typing import Optional
 # ─── Lab-test vocabulary (regex fallback + NER post-process) ──────────────────
 LAB_KEYWORDS = {
     # CBC
-    "WBC": ["wbc", "white blood cell", "เม็ดเลือดขาว"],
-    "RBC": ["rbc", "red blood cell", "เม็ดเลือดแดง"],
-    "HGB": ["hgb", "hb", "hemoglobin", "ฮีโมโกลบิน"],
-    "HCT": ["hct", "hematocrit"],
-    "PLT": ["plt", "platelet", "เกล็ดเลือด"],
+    "WBC": ["wbc", "white blood cell", "เม็ดเลือดขาว", "wbc count"],
+    "RBC": ["rbc", "red blood cell", "เม็ดเลือดแดง", "rbc count"],
+    "HGB": ["hgb", "hb", "hemoglobin", "ฮีโมโกลบิน", "ความเข้มข้นเลือด"],
+    "HCT": ["hct", "hematocrit", "ความเข้มข้นของเลือด"],
+    "PLT": ["plt", "platelet", "เกล็ดเลือด", "platelet count"],
     "MCV": ["mcv"],
     "MCH": ["mch"],
     "MCHC": ["mchc"],
+    
     # Lipid
-    "Total Cholesterol": ["total cholesterol", "cholesterol", "โคเลสเตอรอล"],
-    "LDL": ["ldl", "ldl-c", "ไขมันเลว"],
-    "HDL": ["hdl", "hdl-c", "ไขมันดี"],
-    "Triglycerides": ["tg", "triglyceride", "ไตรกลีเซอไรด์"],
+    "Total Cholesterol": ["total cholesterol", "cholesterol", "โคเลสเตอรอล", "คอเลสเตอรอล", "tc"],
+    "LDL": ["ldl", "ldl-c", "ldl c", "ไขมันเลว", "ldl-cholesterol"],
+    "HDL": ["hdl", "hdl-c", "hdl c", "ไขมันดี", "hdl-cholesterol"],
+    "Triglycerides": ["tg", "triglyceride", "ไตรกลีเซอไรด์", "triglycerides"],
+    
     # Glucose
-    "FBS": ["fbs", "fasting blood sugar", "fasting glucose", "น้ำตาลอดอาหาร"],
-    "HbA1c": ["hba1c", "a1c", "glycated hemoglobin"],
+    "FBS": ["fbs", "fasting blood sugar", "fasting glucose", "น้ำตาลอดอาหาร", "น้ำตาลในเลือด"],
+    "HbA1c": ["hba1c", "a1c", "glycated hemoglobin", "น้ำตาลสะสม", "น้ำตาลเฉลี่ยสะสม"],
+    
     # Liver
-    "AST": ["ast", "sgot"],
-    "ALT": ["alt", "sgpt"],
+    "AST": ["ast", "sgot", "ast (sgot)"],
+    "ALT": ["alt", "sgpt", "alt (sgpt)"],
     "ALP": ["alp", "alkaline phosphatase"],
-    "Total Bilirubin": ["total bilirubin", "t.bili"],
+    "Total Bilirubin": ["total bilirubin", "t.bili", "t-bili"],
+    "Albumin": ["albumin", "alb", "อัลบูมิน"], # เพิ่มเติม: โปรตีนตับ/เลือด
+    
     # Kidney
-    "Creatinine": ["creatinine", "cr", "ครีเอทินิน"],
+    "Creatinine": ["creatinine", "cr", "ครีเอทินิน", "b-creatinine"],
     "BUN": ["bun", "blood urea nitrogen"],
-    "eGFR": ["egfr", "gfr"],
+    "eGFR": ["egfr", "gfr", "estimated gfr"],
     "Uric Acid": ["uric acid", "ua", "กรดยูริก"],
+    
+    # ➕ เพิ่มกลุ่ม Electrolyte (เกลือแร่)
+    "Sodium": ["sodium", "na", "โซเดียม"],
+    "Potassium": ["potassium", "k", "โพแทสเซียม"],
+    "Chloride": ["chloride", "cl", "คลอไรด์"],
+    "Bicarbonate": ["bicarbonate", "co2", "total co2", "hco3"],
+
     # Thyroid
     "TSH": ["tsh"],
-    "T3": ["t3", "triiodothyronine"],
-    "T4": ["t4", "thyroxine"],
+    "T3": ["t3", "triiodothyronine", "free t3", "ft3"],
+    "T4": ["t4", "thyroxine", "free t4", "ft4"],
+    
     # Others
     "CRP": ["crp", "c-reactive protein"],
-    "Vitamin D": ["vitamin d", "25-oh", "25oh"],
+    "Vitamin D": ["vitamin d", "25-oh", "25oh", "25-hydroxyvitamin d"],
     "Iron": ["iron", "serum iron"],
 }
 
@@ -61,9 +74,9 @@ def _load_ner_model():
         from transformers import pipeline as hf_pipeline
         ner = hf_pipeline(
             "ner",
-            model="dslim/bert-base-NER",
+            model="d4data/biomedical-ner-all",
             aggregation_strategy="simple",
-            device=-1,          # CPU; เปลี่ยนเป็น 0 ถ้ามี GPU
+            device=-0,          # ⚠️ ตรงนี้ให้ใช้เป็น -1 สำหรับ CPU หรือ 0 สำหรับ GPU ครับ (-0 อาจทำให้บาง Library สับสนได้)
         )
         return ner
     except Exception as e:
@@ -136,17 +149,16 @@ def extract_with_ner(text: str, ner_model) -> tuple[list[dict], list[dict]]:
         return [], []
 
     try:
-        raw_entities = ner_model(text[:512])  # bert max 512 tokens
+        raw_entities = ner_model(text)
     except Exception:
         return [], []
 
-    # bert-base-NER ให้ label: PER, ORG, LOC, MISC
-    # ชื่อค่าแล็บมักถูก tag เป็น MISC หรือ ORG
+    MEDICAL_LABELS = {"Disease", "Chemical", "Diagnostic_procedure", "Medication", "Lab_value"}
     found_names = []
     for ent in raw_entities:
         word = ent["word"].replace("##", "")
         label = ent.get("entity_group", ent.get("entity", ""))
-        if label in ("MISC", "ORG") and len(word) >= 2:
+        if label in MEDICAL_LABELS and len(word) >= 2:
             canonical = _canonicalize(word)
             if canonical:
                 found_names.append({
@@ -179,36 +191,44 @@ def extract_with_ner(text: str, ner_model) -> tuple[list[dict], list[dict]]:
 def run_ner_extraction(text: str, use_ner: bool = True) -> dict:
     """
     รับข้อความจาก OCR และดึงค่าแล็บ
-    - ใช้ Regex เป็นหลัก (แม่นยำที่สุดสำหรับรูปแบบ Lab)
-    - ใช้ BERT NER เพื่อยืนยันว่าโมเดลทำงานได้
+    - ใช้ Regex เป็นฐานข้อมูลหลัก 
+    - ใช้ BioBERT เพื่อช่วยเก็บตกค่าแล็บที่แพทเทิร์นแปลกๆ หลุดจาก Regex
     """
     t0 = time.perf_counter()
 
     # 1) Regex extraction (ตัวหลัก)
     regex_results = extract_with_regex(text)
 
-    # 2) โหลด BERT NER และรันเพื่อเช็กว่าโมเดลทำงาน
+    # 2) เตรียมตัวแปรสำหรับ NER
     ner_loaded = False
     raw_ner = []
     ner_results = []
 
+    # เปลี่ยนโครงสร้างตรงนี้: เช็กก่อนว่าผู้ใช้สั่งเปิดไหม แล้วค่อยลองดึงโมเดลมาทำงาน
     if use_ner:
-        model = get_ner_model()
+        model = get_ner_model()  # 👈 ต้องดึงโมเดลผ่านฟังก์ชันนี้ขึ้นมาก่อน
         if model is not None:
             ner_loaded = True
             try:
-                # รันโมเดลจริงเพื่อยืนยันว่าถูกใช้งาน
-                raw_ner = model(text[:512])
+                # รันสกัดข้อมูลด้วยโมเดลแพทย์ที่เราปรับปรุงในจุดที่ 1
+                ner_results, raw_ner = extract_with_ner(text, model)
             except Exception:
                 raw_ner = []
+                ner_results = []
+    
+    # 3) รวมร่างแบบป้องกันตัวซ้ำ (หากชื่อซ้ำกัน ให้ยึดค่าแล็บจาก Regex เป็นหลัก)
+    merged_entities = {v["name"]: v for v in regex_results}
+    for nv in ner_results:
+        if nv["name"] not in merged_entities:
+            merged_entities[nv["name"]] = nv
 
     elapsed = round((time.perf_counter() - t0) * 1000, 1)
 
     return {
-        "entities": regex_results,              # ใช้ regex เป็นผลลัพธ์หลัก
+        "entities": list(merged_entities.values()),  # ✅ รวมพลังดึงค่ามาครบถ้วนแน่นอน
         "regex_count": len(regex_results),
-        "ner_count": len(raw_ner),             # จำนวน entity ดิบจาก BERT
-        "merged_count": len(regex_results),    # จำนวนค่าตรวจจริง
+        "ner_count": len(ner_results), 
+        "merged_count": len(merged_entities),    
         "ner_loaded": ner_loaded,
         "processing_ms": elapsed,
         "raw_ner_entities": raw_ner,
