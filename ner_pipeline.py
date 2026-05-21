@@ -113,57 +113,68 @@ def get_ner_model():
 
 # ─── Regex-based extraction (fast fallback / complement) ──────────────────────
 _VALUE_RE = re.compile(
-    # ✅ เพิ่ม \(\) เข้าไปเพื่อให้รองรับวงเล็บในชื่อ และเพิ่มความยาวเป็น 60 เผื่อชื่อยาว
-    r"([A-Za-zÀ-ÿก-๙][A-Za-zÀ-ÿก-๙0-9\-\s\.\(\)\/]{1,60}?)"
-    r"\s*(?:[:\-=]\s*|\s+)"
-    # ✅ เพิ่ม (?:\/\d+)? เข้าไปด้านหลัง เพื่อให้ดึงตัวเลขแบบ 180/100 (ความดัน) ได้
-    r"([\d]+(?:[.,]\d+)?(?:\/\d+)?)"
-    r"\s*"
-    r"(" + "|".join(UNIT_PATTERNS) + r")?",
+    r"([A-Za-zÀ-ÿก-๙0-9\-\s\(\)\/]{2,60}?)"  # ดึงชื่อยาวๆ รวมวงเล็บ
+    r"(?:[:\-=]\s*|\s+)"                     # ตัวคั่น (:, -, =, หรือแค่เว้นวรรค)
+    r"([\d]+(?:[.,]\d+)?(?:\/\d+)?)"         # ตัวเลข (ทศนิยม หรือ / แบบความดัน)
+    r"(?:\s*([A-Za-zก-๙\/\%]+))?",            # หน่วย (ถ้ามี)
     re.IGNORECASE,
 )
 
 def extract_with_regex(text: str) -> list[dict]:
-    """ดึง lab-value ด้วย regex เป็น baseline"""
     results = []
-    for m in _VALUE_RE.finditer(text):
-        name_raw = m.group(1).strip()
-        value    = m.group(2).replace(",", ".")
-        unit     = m.group(3) or ""
-
-        # จับคู่กับ keyword dict
-        canonical = _canonicalize(name_raw)
-        if canonical:
-            results.append({
-                "name":  canonical,
-                "value": value,
-                "unit":  unit,
-                "source": "regex",
-            })
+    # ประมวลผลทีละบรรทัด ป้องกันตัวเลขกระโดดข้ามบรรทัด
+    for line in text.split('\n'):
+        line = line.strip()
+        if not line: continue
+        
+        match = _VALUE_RE.search(line)
+        if match:
+            name_raw = match.group(1).strip()
+            val_raw = match.group(2).strip()
+            unit_raw = match.group(3).strip() if match.group(3) else ""
+            
+            canon = _canonicalize(name_raw)
+            if canon:
+                results.append({
+                    "name": canon,
+                    "value": val_raw,
+                    "unit": unit_raw,
+                    "source": "regex"
+                })
     return results
 
 
-def _canonicalize(raw: str) -> Optional[str]:
-    """เปลี่ยน raw string → ชื่อมาตรฐาน หรือ None ถ้าไม่ใช่ค่าแล็บ"""
-    raw_lower = raw.lower().strip()
-    for canonical, aliases in LAB_KEYWORDS.items():
-        if raw_lower == canonical.lower() or raw_lower in aliases:
-            return canonical
+def _canonicalize(raw_name: str) -> str:
+    text = raw_name.lower().strip()
+    
+    # 1. ลบข้อความในวงเล็บทิ้งไปเลย ป้องกันความสับสน (เช่น (FPG), (Blood))
+    text = re.sub(r'\(.*?\)', '', text).strip()
+    
+    # 2. ดักจับคำเฉพาะที่มักจะโดนดึงผิด (เช็ก Substring)
+    if "hba1c" in text or "a1c" in text: return "HbA1c"
+    if "hdl" in text: return "HDL"
+    if "ldl" in text: return "LDL"
+    if "fbs" in text or "fasting" in text or "fpg" in text: return "FBS"
+    if "bmi" in text or "mass index" in text: return "BMI"
+    if "pressure" in text: return "Blood Pressure"
+    if "creatinine" in text: return "Creatinine"
+    
+    # 3. วนลูปเช็ก Exact Match แบบปกติ
+    for canon, aliases in LAB_KEYWORDS.items():
+        if text in aliases:
+            return canon
+            
+    # 4. วนลูปเช็ก Substring (กรณีพิมพ์ชื่อยาวเกิน)
+    for canon, aliases in LAB_KEYWORDS.items():
         for alias in aliases:
-            if alias in raw_lower or raw_lower in alias:
-                return canonical
-    # ถ้าชื่อสั้น ≤ 6 ตัวและเป็น uppercase ก็ยอมรับ (เช่น WBC, LDL)
-    if len(raw) <= 6 and raw.isupper():
-        return raw
-    return None
+            if len(alias) >= 3 and alias in text:
+                return canon
+                
+    return ""
 
 
 # ─── NER-based extraction ─────────────────────────────────────────────────────
 def extract_with_ner(text: str, ner_model) -> tuple[list[dict], list[dict]]:
-    """
-    รัน Biomedical NER แล้วใช้เทคนิคระยะห่างอักษร (Proximity Mapping) 
-    ในการควานหาตัวเลขที่อยู่ใกล้ชื่อแล็บที่สุด เพื่อป้องกันการแมตช์ชื่อพลาด
-    """
     if ner_model is None:
         return [], []
 
@@ -172,68 +183,39 @@ def extract_with_ner(text: str, ner_model) -> tuple[list[dict], list[dict]]:
     except Exception:
         return [], []
 
+    # 1. รัน Regex ก่อนเลย เพราะแม่นยำกว่าในรูปแบบข้อความบรรทัดๆ
+    regex_results = extract_with_regex(text)
+    final_dict = {item["name"]: item for item in regex_results}
+
+    # 2. ให้ NER เก็บตกตัวที่ Regex อาจจะหลุด (เช่น ข้อความแบบร่ายยาว)
     MEDICAL_LABELS = {"Disease", "Chemical", "Diagnostic_procedure", "Medication", "Lab_value"}
-    found_names = []
     
     for ent in raw_entities:
         word = ent["word"].replace("##", "")
         label = ent.get("entity_group", ent.get("entity", ""))
-        if label in MEDICAL_LABELS and len(word) >= 2:
-            canonical = _canonicalize(word)
-            if canonical:
-                found_names.append({
-                    "canonical": canonical,
-                    "start": ent.get("start", 0),
-                    "end": ent.get("end", len(text)),
-                    "score": round(ent["score"], 4),
-                    "label": label,
-                })
-
-    # ดึงตัวเลขและหน่วยทั้งหมดในข้อความออกมากางไว้ก่อน
-    # Regex ตัวนี้จะโฟกัสจับเฉพาะก้อนตัวเลข [ขอบเขตสั้นๆ] เพื่อเอาไปผูกกับชื่อแล็บด้านบน
-    number_pattern = re.compile(r"([\d]+(?:[.,]\d+)?)\s*(" + "|".join(UNIT_PATTERNS) + r")?", re.IGNORECASE)
-    all_numbers = []
-    for num_match in number_pattern.finditer(text):
-        all_numbers.append({
-            "value": num_match.group(1).replace(",", "."),
-            "unit": num_match.group(2) or "",
-            "start": num_match.start(),
-        })
-
-    lab_entities = []
-    for fn in found_names:
-        best_value = "—"
-        best_unit = ""
-        min_distance = 999999
         
-        # วิ่งหาตัวเลขที่อยู่ "เยื้องหลัง" ชื่อแล็บตัวนั้นๆ ในระยะที่ใกล้ที่สุด
-        for num in all_numbers:
-            # ตัวเลขควรอยู่หลังชื่อแล็บ (num['start'] >= fn['end']) 
-            if num["start"] >= fn["start"]:
-                distance = num["start"] - fn["end"]
-                if distance < min_distance and distance < 30: # ระยะห่างไม่ควรเกิน 30 ตัวอักษร
-                    min_distance = distance
-                    best_value = num["value"]
-                    best_unit = num["unit"]
+        if label in MEDICAL_LABELS and len(word) >= 2:
+            canon = _canonicalize(word)
+            
+            # ถ้า NER เจอชื่อมาตรฐานที่ Regex หา "ไม่เจอ" ค่อยพยายามจับคู่ตัวเลขให้
+            if canon and canon not in final_dict:
+                # ลองหาตัวเลขที่อยู่ใกล้ๆ (Proximity Logic) ภายในระยะ 30 ตัวอักษร
+                # อัปเดต Regex ตรงนี้ให้รองรับตัวเลขแบบความดัน (เช่น 180/100) ด้วย
+                text_after_entity = text[ent.get("end", 0):ent.get("end", 0)+30]
+                number_match = re.search(r"([\d]+(?:[.,]\d+)?(?:\/\d+)?)", text_after_entity)
+                
+                if number_match:
+                    final_dict[canon] = {
+                        "name": canon,
+                        "value": number_match.group(1),
+                        "unit": "",
+                        "ner_score": round(ent["score"], 4),
+                        "ner_label": label,
+                        "source": "ner" # บอกให้รู้ว่าดึงมาจาก NER + Proximity
+                    }
 
-        # ถ้าหาจากตัวเลขใกล้เคียงไม่เจอจริงๆ ค่อยไป Fallback ดึงจาก Regex Map แบบเก่า
-        if best_value == "—":
-            regex_vals = extract_with_regex(text)
-            regex_map = {v["name"]: v for v in regex_vals}
-            val_info = regex_map.get(fn["canonical"], {})
-            best_value = val_info.get("value", "—")
-            best_unit = val_info.get("unit", "")
-
-        lab_entities.append({
-            "name":       fn["canonical"],
-            "value":      best_value,
-            "unit":       best_unit,
-            "ner_score":  fn["score"],
-            "ner_label":  fn["label"],
-            "source":     "ner",
-        })
-
-    return lab_entities, raw_entities
+    # คืนค่าผลลัพธ์รอบเดียวจบตรงนี้ โค้ดขยะด้านล่างถูกเคลียร์ทิ้งหมดแล้ว
+    return list(final_dict.values()), raw_entities
 
 
 # ─── Main public function ─────────────────────────────────────────────────────
