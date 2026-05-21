@@ -1,7 +1,7 @@
 # 🧬 Health Screener & Lab Explainer
 
 ระบบ AI สำหรับช่วยวิเคราะห์ผลตรวจสุขภาพ (Lab Results) พร้อมอธิบายผลเป็นภาษาไทยแบบเข้าใจง่าย  
-ใช้ NER + Multi-LLM (Claude / Gemini / GPT) พร้อมระบบ Validation สำหรับทดสอบความแม่นยำ
+ใช้ NER + GROQ LLM พร้อมระบบ Validation สำหรับทดสอบความแม่นยำ
 
 > ⚠️ ระบบนี้เป็นเพียงเครื่องมือช่วยวิเคราะห์เบื้องต้น ไม่ใช่การวินิจฉัยโรค  
 > ควรปรึกษาแพทย์ผู้เชี่ยวชาญก่อนตัดสินใจทางการแพทย์
@@ -13,9 +13,7 @@
 - กรอกข้อมูลแบบข้อความ (Manual Input)
 
 ### 🤖 AI Models
-- Claude (Anthropic)
-- Gemini (Google)
-- GPT (OpenAI)
+- GROQ
 
 ### 🧠 NLP Pipeline
 - Named Entity Recognition (NER)
@@ -60,7 +58,7 @@ pip install -r requirements.txt
 ### 2. ตรวจสอบระบบ
 
 ```bash
-python -c "import streamlit, anthropic, openai, google.genai, PIL, transformers, torch, torchvision, pandas, plotly; print('All packages installed successfully!')"
+python -c "import streamlit, openai, PIL, transformers, torch, torchvision, pandas, plotly; print('All packages installed successfully!')"
 ```
 หากขึ้น: All packages installed successfully! แปลว่าพร้อมใช้งาน 🎉
 
@@ -75,15 +73,6 @@ python -m streamlit run app.py
 
 ## 🖥️ วิธีใช้งาน
 
-### 🔹 Sidebar
-
-ผู้ใช้สามารถ:
-
-* เลือก AI Model (Claude / Gemini / GPT)
-* ใส่ API Key
-* เปิด/ปิดระบบ NER
-
-
 ### 🔹 วิเคราะห์ผลตรวจ
 
 1. อัปโหลดภาพ หรือกรอกค่าตรวจ
@@ -91,6 +80,8 @@ python -m streamlit run app.py
 
    * อายุ
    * เพศ
+   * น้ำหนัก
+   * ส่วนสูง
    * BMI
    * อาการ
 3. กดปุ่ม **🔬 วิเคราะห์ผลตรวจ**
@@ -123,7 +114,7 @@ NER (bert-base-NER)
         ↓
 Structured Prompt
         ↓
-LLM (Claude / Gemini / GPT)
+LLM GROQ
         ↓
 JSON Output
         ↓
@@ -176,7 +167,7 @@ UI Rendering
 
 ## 🛠️ Tech Stack
 
-* 🧠 LLMs: Claude / Gemini / GPT
+* 🧠 LLMs: GROQ
 * 🧾 UI: Streamlit
 * 🧠 NLP: HuggingFace Transformers
 * 📊 Data: Pandas
