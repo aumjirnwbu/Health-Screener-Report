@@ -181,11 +181,16 @@ with main_tab:
         manual_text      = ""
 
         with input_tab1:
+            if "uploaded_file_key" not in st.session_state:
+                st.session_state.uploaded_file_key = 0
             uploaded_file = st.file_uploader(
-                "ภาพผลตรวจ (JPG/PNG)", type=["jpg","jpeg","png"],
+                "ภาพผลตรวจ (JPG/PNG)",
+                type=["jpg","jpeg","png"],
+                key=f"upload_{st.session_state.uploaded_file_key}",
                 label_visibility="collapsed"
             )
             if uploaded_file:
+                st.session_state["manual_lab_text"] = ""
                 manual_text = ""
                 img = Image.open(uploaded_file)
                 st.image(img, use_container_width=True)
@@ -196,16 +201,21 @@ with main_tab:
 
         with input_tab2:
             manual_text = st.text_area(
-                "ค่าตรวจ", height=180, label_visibility="collapsed",
+                "ค่าตรวจ",
+                key="manual_lab_text",
+                height=180,
+                label_visibility="collapsed",
                 placeholder=(
                     "HbA1c: 6.8\nFBS: 130\nTotal Cholesterol: 220\n"
-                    "LDL: 145\nHDL: 42\nTriglycerides: 180\n"
-                    "AST: 45\nALT: 52\nWBC: 8.5"
+                    "LDL: 145\nHDL: 42\nTriglycerides: 180"
                 )
             )
         if manual_text.strip():
             uploaded_image = None
             uploaded_mimetype = "image/png"
+            
+            if uploaded_file is not None:
+                st.session_state.uploaded_file_key += 1
 
         st.markdown("#### 🧾 ข้อมูลเพิ่มเติม")
         c1, c2, c3 = st.columns(3)
