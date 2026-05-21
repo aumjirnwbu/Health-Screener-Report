@@ -68,12 +68,9 @@ html, body, [class*="css"] { font-family: 'IBM Plex Sans Thai', sans-serif; }
 </style>
 """, unsafe_allow_html=True)
 
-# ─── Header ───────────────────────────────────────────────────────────────────
-
 # ─── Groq Config ─────────────────────────────────────────────────────────────
 provider = "groq"
 model_id = "meta-llama/llama-4-scout-17b-16e-instruct"
-
 api_key = st.secrets["GROQ_API_KEY"]
 
 st.markdown("""
@@ -118,70 +115,76 @@ with main_tab:
     # ── Input (left) ──────────────────────────────────────────────────────────
     with left_col:
         st.markdown("#### 📥 ข้อมูลผลตรวจ")
-        # ─────────────────────────────────────────────
-        # init session state
-        # ─────────────────────────────────────────────
-        if "uploaded_file_key" not in st.session_state:
-            st.session_state.uploaded_file_key = 0
-
-        if "manual_lab_text" not in st.session_state:
-            st.session_state.manual_lab_text = ""
         
+        # ──────────────────────────────────────────────────────────────────────
+        # ✅ ระบบจัดการเวอร์ชันของ Widget เพื่อล้างค่าข้ามฝั่งอย่างไร้รอยต่อ
+        # ──────────────────────────────────────────────────────────────────────
+        if "file_uploader_version" not in st.session_state:
+            st.session_state.file_uploader_version = 0
+
+        if "text_area_version" not in st.session_state:
+            st.session_state.text_area_version = 0
+
         if "uploaded_image_data" not in st.session_state:
             st.session_state.uploaded_image_data = None
 
         uploaded_image = st.session_state.uploaded_image_data
         uploaded_mimetype = "image/png"
-        if st.session_state.get("clear_inputs_flag", False):
-            st.session_state.manual_lab_text = ""
-            st.session_state.uploaded_image_data = None
-            st.session_state.clear_inputs_flag = False
-        # ─────────────────────────────────────────────
+
+        # ─── Callbacks สำหรับสลับล้างค่าระหว่าง Tab นิติกรรม (ปลอดภัย ไม่เกิด loop)
+        def handle_file_upload():
+            file_key = f"upload_{st.session_state.file_uploader_version}"
+            if st.session_state.get(file_key) is not None:
+                # ถ้ามีการอัปโหลดรูป ให้เปลี่ยนเวอร์ชันของกล่องข้อความเพื่อล้างค่าว่างทันที
+                st.session_state.text_area_version += 1
+
+        def handle_text_change():
+            text_key = f"manual_lab_{st.session_state.text_area_version}"
+            if st.session_state.get(text_key, "").strip():
+                # ถ้ามีการพิมพ์ข้อความ ให้เปลี่ยนเวอร์ชันตัวอัปโหลดไฟล์เพื่อล้างค่ารูปภาพ
+                st.session_state.file_uploader_version += 1
+                st.session_state.uploaded_image_data = None
+
+        # ──────────────────────────────────────────────────────────────────────
         # tabs
-        # ─────────────────────────────────────────────
-        input_tab1, input_tab2 = st.tabs(
-            ["📷 อัปโหลดภาพ", "✏️ พิมพ์ค่าตรวจ"]
-        )
+        # ──────────────────────────────────────────────────────────────────────
+        input_tab1, input_tab2 = st.tabs(["📷 อัปโหลดภาพ", "✏️ พิมพ์ค่าตรวจ"])
 
         # ─────────────────────────────────────────────
         # TAB 1 : upload image
         # ─────────────────────────────────────────────
         with input_tab1:
-
             uploaded_file = st.file_uploader(
                 "ภาพผลตรวจ (JPG/PNG)",
                 type=["jpg", "jpeg", "png"],
-                key=f"upload_{st.session_state.uploaded_file_key}",
-                label_visibility="collapsed"
+                key=f"upload_{st.session_state.file_uploader_version}",
+                label_visibility="collapsed",
+                on_change=handle_file_upload
             )
 
             if uploaded_file is not None:
-
-                # clear text
-                st.session_state.manual_lab_text = ""
-
                 img = Image.open(uploaded_file)
-
                 st.image(img, use_container_width=True)
 
                 buf = io.BytesIO()
                 img.save(buf, format="PNG")
-
+                
                 # เก็บลง session state
                 st.session_state.uploaded_image_data = (
                     base64.b64encode(buf.getvalue()).decode()
                 )
+                uploaded_image = st.session_state.uploaded_image_data
 
         # ─────────────────────────────────────────────
         # TAB 2 : manual input
         # ─────────────────────────────────────────────
         with input_tab2:
-
             manual_text = st.text_area(
                 "ค่าตรวจ",
-                key="manual_lab_text",
+                key=f"manual_lab_{st.session_state.text_area_version}",
                 height=180,
                 label_visibility="collapsed",
+                on_change=handle_text_change,
                 placeholder=(
                     "HbA1c: 6.8\n"
                     "FBS: 130\n"
@@ -191,22 +194,6 @@ with main_tab:
                     "Triglycerides: 180"
                 )
             )
-
-        # ─────────────────────────────────────────────
-        # ถ้ามีพิมพ์ text → ล้างรูป
-        # ─────────────────────────────────────────────
-        if st.session_state.manual_lab_text.strip():
-
-            st.session_state.uploaded_image_data = None
-
-            uploaded_image = None
-            uploaded_mimetype = "image/png"
-
-
-            # reset file uploader
-            st.session_state.uploaded_file_key += 1
-
-            st.rerun()
 
         st.markdown("#### 🧾 ข้อมูลเพิ่มเติม")
         c1, c2 = st.columns(2)
@@ -224,7 +211,6 @@ with main_tab:
         with cb:
             if weight_kg > 0 and height_cm > 0:
                 bmi_v = round(weight_kg / (height_cm / 100) ** 2, 1)
-                # จัดระดับ BMI
                 if bmi_v < 18.5:
                     bmi_cat, bmi_color = "ต่ำกว่าเกณฑ์", "#3b82f6"
                 elif bmi_v < 23:
@@ -254,8 +240,7 @@ with main_tab:
             "โรคหัวใจ","ไม่มีอาการผิดปกติ",
         ])
 
-        analyze_btn = st.button("🔬 วิเคราะห์ผลตรวจ",
-                                use_container_width=True, type="primary")
+        analyze_btn = st.button("🔬 วิเคราะห์ผลตรวจ", use_container_width=True, type="primary")
 
     # ── Result (right) ────────────────────────────────────────────────────────
     with right_col:
@@ -267,18 +252,13 @@ with main_tab:
 
     # ── Analyze logic ─────────────────────────────────────────────────────────
     if analyze_btn:
-        for key in [
-            "last_result",
-            "last_run_id",
-            "last_wf",
-            "last_time",
-            "last_saving",
-            "last_ner",
-        ]:
+        for key in ["last_result", "last_run_id", "last_wf", "last_time", "last_saving", "last_ner"]:
             st.session_state.pop(key, None)
+            
         if not api_key:
             st.error("⚠️ กรุณาใส่ API Key ในแถบซ้าย")
             st.stop()
+            
         if not uploaded_image and not manual_text.strip():
             st.error("⚠️ กรุณาอัปโหลดภาพ หรือพิมพ์ค่าตรวจก่อน")
             st.stop()
@@ -286,9 +266,7 @@ with main_tab:
         run_id   = str(uuid.uuid4())[:8]
         t_start  = time.perf_counter()
 
-        step_results = {s: False for s in
-                        ["file_upload","ocr_extraction","ner_processing",
-                         "llm_analysis","result_display"]}
+        step_results = {s: False for s in ["file_upload","ocr_extraction","ner_processing","llm_analysis","result_display"]}
 
         # Step 1 — file upload
         step_results["file_upload"] = bool(uploaded_image or manual_text.strip())
@@ -300,8 +278,7 @@ with main_tab:
         step_results["ocr_extraction"] = bool(raw_text)
 
         # Step 3 — NER
-        ner_output = {"entities": [], "merged_count": 0,
-                      "ner_loaded": False, "processing_ms": 0}
+        ner_output = {"entities": [], "merged_count": 0, "ner_loaded": False, "processing_ms": 0}
         ner_structured = ""
 
         if raw_text and raw_text != "[image input — OCR via Vision AI]":
@@ -310,16 +287,12 @@ with main_tab:
                 ner_structured = format_for_prompt(ner_output)
             step_results["ner_processing"] = True
         else:
-            # image path — NER ไม่มี text ให้ process แต่ถือว่า step ผ่าน
             step_results["ner_processing"] = True
 
         # Show NER result inline (under left col)
         if ner_output["entities"]:
             with left_col:
-                with st.expander(
-                    f"🔍 NER พบ {ner_output['merged_count']} ค่าตรวจ "
-                    f"({ner_output['processing_ms']} ms)", expanded=False
-                ):
+                with st.expander(f"🔍 NER พบ {ner_output['merged_count']} ค่าตรวจ ({ner_output['processing_ms']} ms)", expanded=False):
                     chips = " ".join(
                         f'<span class="ner-chip">{e["name"]}: {e["value"]}'
                         f'{" " + e["unit"] if e.get("unit") else ""}'
@@ -422,49 +395,29 @@ with main_tab:
         with st.spinner("🧠 Groq Llama Vision กำลังวิเคราะห์..."):
             try:
                 user_prompt = build_prompt()
-
-                from openai import OpenAI
-
                 client = OpenAI(
                     api_key=st.secrets["GROQ_API_KEY"],
                     base_url="https://api.groq.com/openai/v1"
                 )
 
-                # ถ้ามีรูปภาพ
                 if uploaded_image:
                     messages = [
-                        {
-                            "role": "system",
-                            "content": SYSTEM_PROMPT
-                        },
+                        {"role": "system", "content": SYSTEM_PROMPT},
                         {
                             "role": "user",
                             "content": [
-                                {
-                                    "type": "text",
-                                    "text": user_prompt
-                                },
+                                {"type": "text", "text": user_prompt},
                                 {
                                     "type": "image_url",
-                                    "image_url": {
-                                        "url": f"data:image/png;base64,{uploaded_image}"
-                                    }
+                                    "image_url": {"url": f"data:image/png;base64,{uploaded_image}"}
                                 }
                             ]
                         }
                     ]
-
-                # ไม่มีรูป
                 else:
                     messages = [
-                        {
-                            "role": "system",
-                            "content": SYSTEM_PROMPT
-                        },
-                        {
-                            "role": "user",
-                            "content": user_prompt
-                        }
+                        {"role": "system", "content": SYSTEM_PROMPT},
+                        {"role": "user", "content": user_prompt}
                     ]
 
                 response = client.chat.completions.create(
@@ -476,13 +429,8 @@ with main_tab:
                 )
 
                 raw = response.choices[0].message.content.strip()
-
-                # ------------------------------------------------------------------
-                # Parse JSON
-                # ------------------------------------------------------------------
                 cleaned = re.sub(r"```json|```", "", raw).strip()
                 result = json.loads(cleaned)
-
                 step_results["llm_analysis"] = True
 
             except json.JSONDecodeError:
@@ -490,10 +438,8 @@ with main_tab:
                 with st.expander("ดูผลดิบ"):
                     st.text(raw if 'raw' in locals() else "ไม่มีข้อมูล")
                 st.stop()
-
             except Exception as e:
                 error_text = str(e).lower()
-
                 if "authentication" in error_text or "api key" in error_text:
                     st.error("❌ API Key ไม่ถูกต้อง")
                 else:
@@ -503,7 +449,6 @@ with main_tab:
         t_end = time.perf_counter()
         total_time = round(t_end - t_start, 2)
         time_saving = compute_time_saving(total_time)
-        # Step 5 — display
         step_results["result_display"] = result is not None
         wf_report = run_workflow_test(step_results)
 
@@ -526,8 +471,10 @@ with main_tab:
         st.session_state["last_saving"]  = time_saving
         st.session_state["last_ner"]     = ner_output
 
-        st.session_state.clear_inputs_flag = True
-        st.session_state.uploaded_file_key += 1
+        # ✅ ล้างช่องข้อมูล Input ฝั่งซ้ายทั้งหมดหลังจาก AI คำนวณจบเพื่อเริ่มรับค่าใหม่
+        st.session_state.uploaded_image_data = None
+        st.session_state.file_uploader_version += 1
+        st.session_state.text_area_version += 1
 
         st.rerun()
 
@@ -553,8 +500,7 @@ with main_tab:
             result_placeholder.empty()
 
             css, txt = risk_card(result.get("risk_level","normal"))
-            st.markdown(f'<div class="{css}"><strong>{txt}</strong></div>',
-                        unsafe_allow_html=True)
+            st.markdown(f'<div class="{css}"><strong>{txt}</strong></div>', unsafe_allow_html=True)
 
             # Workflow steps strip
             wf_labels = {
@@ -591,8 +537,7 @@ with main_tab:
                     with cc: st.markdown(f"ref: `{v.get('reference','—')}`")
                     with cd:
                         b = badge(v.get("status","normal"))
-                        st.markdown(f'<span class="{b}">{v.get("label","")}</span>',
-                                    unsafe_allow_html=True)
+                        st.markdown(f'<span class="{b}">{v.get("label","")}</span>', unsafe_allow_html=True)
 
             # Explanation
             st.markdown("**💬 คำอธิบาย**")
@@ -603,23 +548,11 @@ with main_tab:
             recommendation = result.get("recommendation", "")
 
             if isinstance(recommendation, list):
-                # ถ้า AI ส่งกลับมาเป็น list ให้แสดงทีละข้อ
-                rec_html = "".join(
-                    f"<div style='margin-bottom:8px;'>• {item}</div>"
-                    for item in recommendation
-                )
+                rec_html = "".join(f"<div style='margin-bottom:8px;'>• {item}</div>" for item in recommendation)
             else:
-                # ถ้าเป็นข้อความธรรมดา
                 rec_html = recommendation
 
-            st.markdown(
-                f"""
-                <div class="rec-box" style="color:#111827;">
-                    {rec_html}
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+            st.markdown(f'<div class="rec-box" style="color:#111827;">{rec_html}</div>', unsafe_allow_html=True)
 
             st.markdown("""<div class="disclaimer">
             ⚠️ ข้อมูลนี้เป็นเพียงเบื้องต้น <strong>ไม่ใช่การวินิจฉัยโรค</strong>
