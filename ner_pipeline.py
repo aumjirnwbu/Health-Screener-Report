@@ -42,6 +42,7 @@ LAB_KEYWORDS = {
     "BUN": ["bun", "blood urea nitrogen"],
     "eGFR": ["egfr", "gfr", "estimated gfr"],
     "Uric Acid": ["uric acid", "ua", "กรดยูริก"],
+    "Creatinine": ["creatinine", "cr", "ครีเอทินิน", "b-creatinine", "creatinine (blood)"],
     
     # ➕ เพิ่มกลุ่ม Electrolyte (เกลือแร่)
     "Sodium": ["sodium", "na", "โซเดียม"],
@@ -58,6 +59,23 @@ LAB_KEYWORDS = {
     "CRP": ["crp", "c-reactive protein"],
     "Vitamin D": ["vitamin d", "25-oh", "25oh", "25-hydroxyvitamin d"],
     "Iron": ["iron", "serum iron"],
+
+    # ในหมวด Glucose (อัปเดต FBS และ HbA1c)
+    "FBS": ["fbs", "fasting blood sugar", "fasting glucose", "น้ำตาลอดอาหาร", "น้ำตาลในเลือด", "fasting blood glucose", "fpg"],
+    "HbA1c": ["hba1c", "a1c", "glycated hemoglobin", "น้ำตาลสะสม", "น้ำตาลเฉลี่ยสะสม"],
+
+    # ในหมวด Lipid (อัปเดต LDL ให้ครอบคลุมคำว่า Direct)
+    "LDL": ["ldl", "ldl-c", "ldl c", "ไขมันเลว", "ldl-cholesterol", "ldl cholesterol"],
+
+    # ในหมวด Kidney (อัปเดต Creatinine)
+    "Creatinine": ["creatinine", "cr", "ครีเอทินิน", "b-creatinine", "creatinine (blood)"],
+
+    # ค่าทางกายภาพและความดัน 
+    "BMI": ["bmi", "body mass index", "ดัชนีมวลกาย"],
+    "Blood Pressure": ["blood pressure", "bp", "ความดัน", "ความดันโลหิต"],
+
+    # เพิ่มกลุ่มความดันโลหิต (Blood Pressure) 
+    "Blood Pressure": ["blood pressure", "bp", "ความดัน", "ความดันโลหิต", "sys/dia"],
 }
 
 UNIT_PATTERNS = [
@@ -95,9 +113,11 @@ def get_ner_model():
 
 # ─── Regex-based extraction (fast fallback / complement) ──────────────────────
 _VALUE_RE = re.compile(
-    r"([A-Za-zÀ-ÿก-๙][A-Za-zÀ-ÿก-๙0-9\-\s\.]{1,40}?)"
+    # ✅ เพิ่ม \(\) เข้าไปเพื่อให้รองรับวงเล็บในชื่อ และเพิ่มความยาวเป็น 60 เผื่อชื่อยาว
+    r"([A-Za-zÀ-ÿก-๙][A-Za-zÀ-ÿก-๙0-9\-\s\.\(\)\/]{1,60}?)"
     r"\s*(?:[:\-=]\s*|\s+)"
-    r"([\d]+(?:[.,]\d+)?)"
+    # ✅ เพิ่ม (?:\/\d+)? เข้าไปด้านหลัง เพื่อให้ดึงตัวเลขแบบ 180/100 (ความดัน) ได้
+    r"([\d]+(?:[.,]\d+)?(?:\/\d+)?)"
     r"\s*"
     r"(" + "|".join(UNIT_PATTERNS) + r")?",
     re.IGNORECASE,
@@ -141,9 +161,8 @@ def _canonicalize(raw: str) -> Optional[str]:
 # ─── NER-based extraction ─────────────────────────────────────────────────────
 def extract_with_ner(text: str, ner_model) -> tuple[list[dict], list[dict]]:
     """
-    รัน bert-base-NER แล้วดึง entity ที่เป็น ORG/MISC (ชื่อค่าแล็บ) และ
-    CARDINAL/QUANTITY (ตัวเลข) — จากนั้น pair ไว้ด้วยกัน
-    คืนค่า: (lab_entities_found, raw_ner_output)
+    รัน Biomedical NER แล้วใช้เทคนิคระยะห่างอักษร (Proximity Mapping) 
+    ในการควานหาตัวเลขที่อยู่ใกล้ชื่อแล็บที่สุด เพื่อป้องกันการแมตช์ชื่อพลาด
     """
     if ner_model is None:
         return [], []
@@ -155,6 +174,7 @@ def extract_with_ner(text: str, ner_model) -> tuple[list[dict], list[dict]]:
 
     MEDICAL_LABELS = {"Disease", "Chemical", "Diagnostic_procedure", "Medication", "Lab_value"}
     found_names = []
+    
     for ent in raw_entities:
         word = ent["word"].replace("##", "")
         label = ent.get("entity_group", ent.get("entity", ""))
@@ -163,22 +183,51 @@ def extract_with_ner(text: str, ner_model) -> tuple[list[dict], list[dict]]:
             if canonical:
                 found_names.append({
                     "canonical": canonical,
-                    "raw_word":  word,
-                    "score":     round(ent["score"], 4),
-                    "label":     label,
+                    "start": ent.get("start", 0),
+                    "end": ent.get("end", len(text)),
+                    "score": round(ent["score"], 4),
+                    "label": label,
                 })
 
-    # จับคู่กับค่าตัวเลขจาก regex
-    regex_vals = extract_with_regex(text)
-    regex_map  = {v["name"]: v for v in regex_vals}
+    # ดึงตัวเลขและหน่วยทั้งหมดในข้อความออกมากางไว้ก่อน
+    # Regex ตัวนี้จะโฟกัสจับเฉพาะก้อนตัวเลข [ขอบเขตสั้นๆ] เพื่อเอาไปผูกกับชื่อแล็บด้านบน
+    number_pattern = re.compile(r"([\d]+(?:[.,]\d+)?)\s*(" + "|".join(UNIT_PATTERNS) + r")?", re.IGNORECASE)
+    all_numbers = []
+    for num_match in number_pattern.finditer(text):
+        all_numbers.append({
+            "value": num_match.group(1).replace(",", "."),
+            "unit": num_match.group(2) or "",
+            "start": num_match.start(),
+        })
 
     lab_entities = []
     for fn in found_names:
-        val_info = regex_map.get(fn["canonical"], {})
+        best_value = "—"
+        best_unit = ""
+        min_distance = 999999
+        
+        # วิ่งหาตัวเลขที่อยู่ "เยื้องหลัง" ชื่อแล็บตัวนั้นๆ ในระยะที่ใกล้ที่สุด
+        for num in all_numbers:
+            # ตัวเลขควรอยู่หลังชื่อแล็บ (num['start'] >= fn['end']) 
+            if num["start"] >= fn["start"]:
+                distance = num["start"] - fn["end"]
+                if distance < min_distance and distance < 30: # ระยะห่างไม่ควรเกิน 30 ตัวอักษร
+                    min_distance = distance
+                    best_value = num["value"]
+                    best_unit = num["unit"]
+
+        # ถ้าหาจากตัวเลขใกล้เคียงไม่เจอจริงๆ ค่อยไป Fallback ดึงจาก Regex Map แบบเก่า
+        if best_value == "—":
+            regex_vals = extract_with_regex(text)
+            regex_map = {v["name"]: v for v in regex_vals}
+            val_info = regex_map.get(fn["canonical"], {})
+            best_value = val_info.get("value", "—")
+            best_unit = val_info.get("unit", "")
+
         lab_entities.append({
             "name":       fn["canonical"],
-            "value":      val_info.get("value", "—"),
-            "unit":       val_info.get("unit", ""),
+            "value":      best_value,
+            "unit":       best_unit,
             "ner_score":  fn["score"],
             "ner_label":  fn["label"],
             "source":     "ner",
