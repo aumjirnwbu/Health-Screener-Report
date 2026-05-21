@@ -76,12 +76,6 @@ model_id = "meta-llama/llama-4-scout-17b-16e-instruct"
 
 api_key = st.secrets["GROQ_API_KEY"]
 
-use_ner = st.toggle(
-    "🤖 เปิดใช้ NER (bert-base-NER)",
-    value=True,
-    help="ใช้ HuggingFace NER ระบุค่าตรวจก่อนส่ง AI"
-)
-
 st.markdown("""
 <div class="main-header">
     <h1>🧬 Health Screener & Lab Explainer</h1>
@@ -107,8 +101,8 @@ with top_c2:
         "3️⃣ AI วิเคราะห์\n"
         "4️⃣ แสดงผล + Metrics"
     )
-
 st.caption("⚠️ ไม่ใช่การวินิจฉัยโรค ควรปรึกษาแพทย์")
+
 st.markdown("---")
 
 # ─── Main Tabs ────────────────────────────────────────────────────────────────
