@@ -120,13 +120,29 @@ with main_tab:
         st.markdown("#### 📥 ข้อมูลผลตรวจ")
         input_tab1, input_tab2 = st.tabs(["📷 อัปโหลดภาพ", "✏️ พิมพ์ค่าตรวจ"])
 
-        uploaded_image   = None
-        uploaded_mimetype = "image/png"
-        manual_text      = ""
+        # ─────────────────────────────────────────────
+        # init session state
+        # ─────────────────────────────────────────────
+        if "uploaded_file_key" not in st.session_state:
+            st.session_state.uploaded_file_key = 0
 
+        if "manual_lab_text" not in st.session_state:
+            st.session_state.manual_lab_text = ""
+
+        uploaded_image = None
+        uploaded_mimetype = "image/png"
+
+        # ─────────────────────────────────────────────
+        # tabs
+        # ─────────────────────────────────────────────
+        input_tab1, input_tab2 = st.tabs(
+            ["📷 อัปโหลดภาพ", "✏️ พิมพ์ค่าตรวจ"]
+        )
+
+        # ─────────────────────────────────────────────
+        # TAB 1 : upload image
+        # ─────────────────────────────────────────────
         with input_tab1:
-            if "uploaded_file_key" not in st.session_state:
-                st.session_state.uploaded_file_key = 0
 
             uploaded_file = st.file_uploader(
                 "ภาพผลตรวจ (JPG/PNG)",
@@ -135,38 +151,57 @@ with main_tab:
                 label_visibility="collapsed"
             )
 
-            if uploaded_file:
-                # ล้าง text area
-                st.session_state["manual_lab_text"] = ""
+            # ถ้ามีการอัปโหลดรูป
+            if uploaded_file is not None:
+
+                # เคลียร์ text area
+                if st.session_state.manual_lab_text != "":
+                    st.session_state.manual_lab_text = ""
+                    st.rerun()
 
                 img = Image.open(uploaded_file)
+
                 st.image(img, use_container_width=True)
 
                 buf = io.BytesIO()
                 img.save(buf, format="PNG")
 
-                uploaded_image = base64.b64encode(buf.getvalue()).decode()
-                uploaded_mimetype = "image/png"
+                uploaded_image = base64.b64encode(
+                    buf.getvalue()
+                ).decode()
 
+        # ─────────────────────────────────────────────
+        # TAB 2 : manual input
+        # ─────────────────────────────────────────────
         with input_tab2:
+
             manual_text = st.text_area(
                 "ค่าตรวจ",
                 key="manual_lab_text",
                 height=180,
                 label_visibility="collapsed",
                 placeholder=(
-                    "HbA1c: 6.8\nFBS: 130\nTotal Cholesterol: 220\n"
-                    "LDL: 145\nHDL: 42\nTriglycerides: 180"
+                    "HbA1c: 6.8\n"
+                    "FBS: 130\n"
+                    "Total Cholesterol: 220\n"
+                    "LDL: 145\n"
+                    "HDL: 42\n"
+                    "Triglycerides: 180"
                 )
             )
 
-        # ถ้ามีพิมพ์ข้อความ → ล้างรูป
-        if manual_text.strip():
-            uploaded_image = None
-            uploaded_mimetype = "image/png"
+        # ─────────────────────────────────────────────
+        # ถ้ามีพิมพ์ text → ล้างรูป
+        # ─────────────────────────────────────────────
+        if st.session_state.manual_lab_text.strip():
 
+            uploaded_image = None
+
+            # reset file uploader
             if uploaded_file is not None:
+
                 st.session_state.uploaded_file_key += 1
+
                 st.rerun()
 
         st.markdown("#### 🧾 ข้อมูลเพิ่มเติม")
